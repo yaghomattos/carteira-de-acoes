@@ -27,12 +27,20 @@ empresa("BBAS3", 28.51).
 empresa("MOVI3", 8.50).
 empresa("VIIA3", 4.03).
 
+:- dynamic empresa/2.
+
+cadastro(X,Y) :- assertz(empresa(X,Y)).
+
 empresas() :- listing(empresa/2).
 %-----------------------------------------------------------------------------------------
 
 
 %-----------------------------------------------------------------------------------------
 %cadastro de operações(Data, Ticket, Operacao, Preço Unitário, Quantidade, Taxas, Custo Total)
+
+:- dynamic operacao/7.
+
+cadastro_operacao(X, Y, Z, P, N) :- T is N * P * 0.00025 + N * P * 0.00005, C is P * N + T, assertz(operacao(X, Y, Z, P, N, T, C)). 
 
 %operacao(Data, Ticket, "Compra", Preço Unitário, Quantidade, Taxas, CustoTotal)
 operacao(11/03/2020, "PETR4", "Compra", 15.34, 200, 0.92, 3068.92).
