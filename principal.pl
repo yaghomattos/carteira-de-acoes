@@ -20,6 +20,12 @@ carrega(A) :-
  exists_file(A),
  consult(A).
 
+:- initialization(init).
+
+init :- carrega('operacoes.bd').
+
+data(D/M/Y) :- get_time(T), stamp_date_time(T, date(Y, M, D, _, _, _, _, _, _), 'UTC').
+
 %-----------------------------------------------------------------------------------------
 
 
@@ -44,11 +50,14 @@ empresas :- listing(empresa/2).
 
 :- dynamic operacao/7.
 
-cadastro_operacao(D, A, O, P, N) :- 
+salva_operacoes :- salva(operacao(_,_,_,_,_,_,_), 'operacoes.bd').
+
+cadastro_operacao(A, O, P, N) :- 
   T is N * P * 0.00025 + N * P * 0.00005,
   C is P * N + T, 
+  data(D),
   assertz(operacao(D, A, O, P, N, T, C)),
-  salva(operacao(D, A, O, P, N, T, C), 'operacoes.bd'). 
+  salva_operacoes. 
 
 /*operacao(11/03/2020, "PETR4", "Compra", 15.34, 200, 0.92, 3068.92).
 operacao(12/03/2020, "PETR4", "Compra", 12.68, 300, 1.14, 3805.14).
@@ -89,7 +98,6 @@ operacoes :-
 calcula_carteira :- 
   retractall(acao(A,B,C,D)), 
   forall(operacao(_,A,_,B,C,_,D), assert(acao(A,B,C,D))). 
-%  salva(acao(_,_,_,_),'carteira.bd').
 
 carteira :- 
   calcula_carteira, 
@@ -101,15 +109,18 @@ carteira :-
 %lucro / prejuízo
 
 :- dynamic ano/2.
-:- dynamic soma/1.
-:- dynamic atual/1.
+:- dynamic soma/2.
+:- dynamic nomes/1.
+:- dynamic lista/1.
 
-calcula_lucro :- 
-  forall(operacao(_,A,_,_,_,_,C), A =:= atual(_) -> soma(soma(_) + C); atual(A), soma(soma(_) + C), assert(ano(A,C))).
+listando :- forall(operacao(_,A,_,_,_,_,_), assert(lista(A))).
+
+teste :- operacao(_,A,_,_,_,_,C), operacao(_,B,_,_,_,_,T), A == B, C =\= T, X is C + T, assert(soma(A, X)).
+
+calcula_lucro :- !.
 
 lucro :- 
-  A is operacao(_,A,_,_,_,_,_),
-  atual(A),
+  listando,
   calcula_lucro,
   listing(ano/2).
 %-----------------------------------------------------------------------------------------
