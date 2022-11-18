@@ -1,28 +1,21 @@
 ## Guia de comandos
 
-> Caso o arquivo "operacoes.bd" exista, então utilizar o comando abaixo para
-> carregar a base de dados.
-
-```
-operacoes.
-```
-
 Cadastro de uma operação de compra ou venda de ação que é salva no banco de dados
 
 ```
-operacao(Data, Ticket, Operacao, Preço Unitário, Quantidade, Taxas, Custo Total).
-```
-
-Exibir a carteira de ações
-
-```
-carteira.
+cadastro_operacao(Ticket, Operacao, Preço Unitário, Quantidade).
 ```
 
 Exibir a lista de operações realizadas
 
 ```
 operacoes.
+```
+
+Exibir a carteira de ações
+
+```
+carteira.
 ```
 
 Exibe o lucro referente ao Ano digitado
