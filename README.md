@@ -24,3 +24,9 @@ Exibir a lista de operações realizadas
 ```
 operacoes.
 ```
+
+Exibe o lucro referente ao Ano digitado
+
+```
+calcula_lucro(Ano).
+```
