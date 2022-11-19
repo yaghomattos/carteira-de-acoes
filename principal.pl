@@ -1,16 +1,4 @@
 %-----------------------------------------------------------------------------------------
-/*:- use_module(library(persistency)).
-
-:- persistent operacao(fact1:any, fact2:any, fact3:any, fact4:any).
-:- persistent compra(fact1:any, fact2:any, fact3:any, fact4:any, fact5:any, fact6:any, fact7:any).
-:- persistent venda(fact1:any, fact2:any, fact3:any, fact4:any, fact5:any, fact6:any, fact7:any).
-
-:- initialization(init).
-
-init:-
-  absolute_file_name('carteira.pl', File, [access(write)]),
-  db_attach(File, []).*/
-
 :- use_module(library(aggregate)).
 
 salva(Predicado,Arquivo) :-
@@ -27,7 +15,6 @@ carrega(A) :-
 init :- carrega('operacoes.bd').
 
 data_hoje(D,M,Y) :- get_time(T), stamp_date_time(T, date(Y, M, D, _, _, _, _, _, _), 'UTC').
-
 %-----------------------------------------------------------------------------------------
 
 
@@ -54,11 +41,18 @@ empresas :- listing(empresa/2).
 
 salva_operacoes :- salva(operacao(_,_,_,_,_,_,_), 'operacoes.bd').
 
-cadastro_operacao(A, O, P, N) :- 
+cadastro_operacao(A, 'Compra', P, N) :- 
   T is N * P * 0.00025 + N * P * 0.00005,
   C is P * N + T, 
   data_hoje(D,M,Y),
-  assertz(operacao(data(D,M,Y), A, O, P, N, T, C)),
+  assertz(operacao(data(D,M,Y), A, 'Compra', P, N, T, C)),
+  salva_operacoes. 
+
+cadastro_operacao(A, 'Venda', P, N) :- 
+  T is N * P * 0.00025 + N * P * 0.00005,
+  C is P * N - T, 
+  data_hoje(D,M,Y),
+  assertz(operacao(data(D,M,Y), A, 'Venda', P, N, T, C)),
   salva_operacoes. 
 
 %operações(Data, Ticket, Operacao, Preço Unitário, Quantidade, Taxas, Custo Total)
@@ -89,7 +83,11 @@ operacao(15/04/2020, 'AMAR3', 'Venda', 5.54, -300, 0.49, -1661.51).*/
 
 operacoes :- 
   carrega('operacoes.bd'),
-  listing(operacao/7).
+  (write('\nData      | Ticket | Operacao | Preço Unitário | Quantidade | Taxas | Custo Total\n'), write('----------------------------------------------------------------------------------\n')),
+  forall(operacao(data(D,M,Y),A,O,P,N,T,C), (write(D),write('/'),write(M),write('/'),
+  write(Y),write(' | '),write(A),write('  | '),write(O),write('   | '),write(P),write('  | '),
+  write(N),write('  | '),write(T),write('  | '),write(C),write('\n'))),
+  write('----------------------------------------------------------------------------------\n\n').
 %-----------------------------------------------------------------------------------------
 
 
@@ -144,8 +142,11 @@ calcula_lucro(Ano) :-
 
 %-----------------------------------------------------------------------------------------
 %operações por ação
-/*O programa deve ter uma funcionalidade para listar todas as operacoes realizadas de uma dada acao.
-Deve ser possivel exibir as operacoes filtradas por ano e tipo da operacao (compra ou venda).*/
 
-operacao_acao(A, Ano, O) :-  forall(operacao(data(_,_,Ano),A,O,_,_,_,_), ).
+operacao_acao(Acao, Ano, Operacao) :-  
+  (write('\nData      | Ticket | Operacao | Preço Unitário | Quantidade | Taxas | Custo Total\n'), write('----------------------------------------------------------------------------------\n')),
+  forall(operacao(data(D,M,Ano),Acao,Operacao,P,N,T,C), (write(D),
+  write('/'),write(M),write('/'),write(Ano),write(' | '),write(Acao),write('  | '),
+  write(Operacao),write('   | '),write(P),write('  | '), write(N),write('  | '),write(T),
+  write('  | '),write(C),write('\n'))).
 %-----------------------------------------------------------------------------------------
