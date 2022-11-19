@@ -18,8 +18,14 @@ Exibir a carteira de ações
 carteira.
 ```
 
-Exibe o lucro referente ao Ano digitado
+Exibir o lucro referente ao Ano digitado
 
 ```
 calcula_lucro(Ano).
+```
+
+Exibir a lista de operações de uma Ação, podendo filtrar pelo ano e tipo de operação
+
+```
+operacao_acao(Acao, Ano, Operacao).
 ```
