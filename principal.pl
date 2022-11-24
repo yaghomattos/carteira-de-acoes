@@ -19,18 +19,38 @@ data_hoje(D,M,Y) :- get_time(T), stamp_date_time(T, date(Y, M, D, _, _, _, _, _,
 
 
 %-----------------------------------------------------------------------------------------
-%empresa(Ticket, Preço Unitário)
-empresa("PETR4", 15.34).
-empresa("ITSA4", 8.51).
-empresa("BBAS3", 28.51).
-empresa("MOVI3", 8.50).
-empresa("VIIA3", 4.03).
+%acao(Ticket, Preço Unitário)
 
-:- dynamic empresa/2.
+:- dynamic acao/2.
+:- dynamic lista_precoU/2.
 
-cadastro(X,Y) :- assertz(empresa(X,Y)).
+acao('PETR4', 15.34).
+acao('PETR4', 15.4).
+acao('PETR4', 15.3).
+acao('PETR4', 1.34).
+acao('ITSA4', 8.51).
+acao('BBAS3', 28.51).
+acao('MOVI3', 8.50).
+acao('VIIA3', 4.03).
 
-empresas :- listing(empresa/2).
+cadastro_acao(X,Y) :- assertz(acao(X,Y)).
+
+precos_acao(A, L) :- bagof(X, acao(A,X), L), assert(lista_precoU(A, L)).
+
+last(X,[X]).
+last(X,[_|T]) :- last(X,T).
+
+member(X,[X|_]).
+member(X,[_|L]) :- member(X,L).
+
+ultimo_preco(A, X) :- 
+  lista_precoU(A, L),
+  last(X,L), !.
+
+acoes :- 
+  (write('\nTicket | Preço Unitário\n'), write('-----------------------\n')),
+  forall(acao(T,P), (write(T),write('  | '),write(P), write('\n'))),
+  write('-----------------------\n\n').
 %-----------------------------------------------------------------------------------------
 
 
@@ -41,45 +61,31 @@ empresas :- listing(empresa/2).
 
 salva_operacoes :- salva(operacao(_,_,_,_,_,_,_), 'operacoes.bd').
 
+%truncagem para números positivos
+trunca(X,Y) :- X >= 0, Y is floor(10^2 * X)/10^2, !.
+
+%truncagem para números negativos
+trunca(X,Y) :- X <0, Y is ceil(10^2 * X)/10^2, !. 
+
 cadastro_operacao(A, 'Compra', P, N) :- 
   T is N * P * 0.00025 + N * P * 0.00005,
+  trunca(T,TT),
   C is P * N + T, 
+  trunca(C,CT),
   data_hoje(D,M,Y),
-  assertz(operacao(data(D,M,Y), A, 'Compra', P, N, T, C)),
-  salva_operacoes. 
+  assertz(operacao(data(D,M,Y), A, 'Compra', P, N, TT, CT)),
+  salva_operacoes, !. 
 
 cadastro_operacao(A, 'Venda', P, N) :- 
   T is N * P * 0.00025 + N * P * 0.00005,
+  trunca(T,TT),
   C is P * N - T, 
+  trunca(C,CT),
   data_hoje(D,M,Y),
-  assertz(operacao(data(D,M,Y), A, 'Venda', P, N, T, C)),
-  salva_operacoes. 
+  assertz(operacao(data(D,M,Y), A, 'Venda', P, N, TT, CT)),
+  salva_operacoes, !. 
 
 %operações(Data, Ticket, Operacao, Preço Unitário, Quantidade, Taxas, Custo Total)
-/*operacao(11/03/2020, 'PETR4', 'Compra', 15.34, 200, 0.92, 3068.92).
-operacao(12/03/2020, 'PETR4', 'Compra', 12.68, 300, 1.14, 3805.14).
-operacao(18/03/2020, 'PETR4', 'Compra', 10.98, 100, 0.32, 1098.32).
-operacao(20/03/2020, 'ITSA4', 'Compra', 8.51, 100, 0.25, 851.25).
-operacao(31/03/2020, 'BBAS3', 'Compra', 28.51, 100, 0.85, 2850.85).
-operacao(31/03/2020, 'MOVI3', 'Compra', 8.50, 100, 0.25, 850.25).
-operacao(31/03/2020, 'MOVI3', 'Compra', 8.00, 100, 0.24, 800.24).
-operacao(01/04/2020, 'AMAR3', 'Compra', 3.98, 200, 0.23, 796.23).
-operacao(02/04/2020, 'AMAR3', 'Compra', 3.79, 100, 0.11, 379.11).
-operacao(03/04/2020, 'VIIA3', 'Compra', 4.03, 100, 0.12, 403.12).
-operacao(03/04/2020, 'BBSE3', 'Compra', 22.81, 100, 0.68, 2281.68).
-operacao(03/04/2020, 'CMIG4', 'Compra', 7.99, 100, 0.23, 799.23).
-operacao(24/04/2020, 'BBAS3', 'Compra', 24.99, 200, 1.49, 4999.49).
-operacao(07/05/2020, 'CIEL3', 'Compra', 3.62, 200, 0.21, 362.21).
-operacao(19/03/2020, 'PETR4', 'Venda', 12.60, -100, 0.37, -1259.63).
-operacao(02/04/2020, 'PETR4', 'Venda', 16.00, -200, 0.96, -3199.04).
-operacao(07/04/2020, 'ITSA4', 'Venda', 9.10, -100, 0.27, -909.73).
-operacao(24/03/2020, 'PETR4', 'Venda', 13.29, -300, 1.19, -3985.81).
-operacao(07/04/2020, 'BBAS3', 'Venda', 30.11, -100, 0.90, -3010.10). 
-operacao(08/04/2020, 'MOVI3', 'Venda', 9.18, -200, 0.55, -1835.45).
-operacao(09/04/2020, 'VIIA3', 'Venda', 5.41, -100, 0.16, -540.84).
-operacao(09/04/2020, 'CMIG4', 'Venda', 9.42, -100, 0.28, -941.72).
-operacao(14/04/2020, 'BBSE3', 'Venda', 27.00, -100, 0.81, -2699.19).
-operacao(15/04/2020, 'AMAR3', 'Venda', 5.54, -300, 0.49, -1661.51).*/
 
 operacoes :- 
   carrega('operacoes.bd'),
@@ -95,10 +101,78 @@ operacoes :-
 %carteira de ações(Ação, Preço Médio, Quantidade, Valor Investido)
 
 :- dynamic acao/4.
+:- dynamic nomes/1.
+:- dynamic lista_nomes/1.
+:- dynamic teste/2.
+:- dynamic acao_quantidade/2.
+:- dynamic acao_taxa/2.
+:- dynamic acao_preco_medio/2.
+:- dynamic taxa/2.
+:- dynamic preco/2.
+:- dynamic quantidade/2.
+
+/*funções de manipulação de lista*/
+elemento(X,[X|_]).
+elemento(X,[_|L]) :- elemento(X,L).
+
+ultimo(X,[X]).
+ultimo(X,[_|T]) :- ultimo(X,T).
+
+remove_primeiro([_|X], X). 
+/*funções de manipulação de lista*/
+
+separa_nomes :-
+  retractall(nomes(_)),
+  forall(operacao(data(_,_,_),A,_,_,_,_,_), assert(nomes(A))). 
+
+nomes :- setof(X, nomes(X), L), assert(lista_nomes(L)).
+
+separa_quantidade :- forall(operacao(data(_,_,_),A,_,_,N,_,_), assert(acao_quantidade(A,N))).
+
+lista_quantidade :- forall(bagof(N, acao_quantidade(A,N), L), assert(quantidade(A, L))), 
+  listing(quantidade/2).
+
+soma_quantidade :- forall(quantidade(A,_), 
+  (quantidade(A,L), (aggregate(sum(X), elemento(X,L), Total)), assert(teste(A,Total)))),
+  listing(teste/2).
+
+separa_taxa :- forall(operacao(data(_,_,_),A,_,_,_,T,_), assert(acao_taxa(A,T))).
+
+lista_taxa :- forall(bagof(T, acao_taxa(A,T), L), assert(taxa(A, L))), 
+  listing(taxa/2).
+
+separa_preco :- forall(operacao(data(_,_,_),A,_,P,_,_,_), assert(acao_preco_medio(A,P))).
+
+lista_preco :- forall(bagof(P, acao_preco_medio(A,P), L), assert(preco(A, L))), 
+  listing(preco/2).
+
+separa :-   
+  separa_quantidade,
+  lista_quantidade,
+  separa_taxa,
+  lista_taxa,
+  separa_preco,
+  lista_preco,
+  separa_nomes,
+  nomes.
+
+recursao(A, LP, LN, LT) :- 
+  acao(A, LP, LN, LT),
+  (elemento(P, LP),
+  elemento(N, LN),  
+  elemento(T, LT)),
+  (write(A),write(', '),write(P),write(', '),write(N),write(', '),write(T),write('\n')),
+  remove_primeiro(LP, X), remove_primeiro(LN, Y), remove_primeiro(LT, Z),
+  assert(acao(A,P,N,T)),
+  recursao(A, X, Y, Z).
+
+calcula_preco_medio :- 
+  separa,
+  lista_nomes(Y),
+  forall(elemento(A, Y), (preco(A, P), quantidade(A, N), taxa(A, T), assert(acao(A, P, N, T)))).
 
 calcula_carteira :- 
-  retractall(acao(A,B,C,D)), 
-  forall(operacao(_,A,_,B,C,_,D), assert(acao(A,B,C,D))). 
+  calcula_preco_medio.
 
 carteira :- 
   calcula_carteira, 
