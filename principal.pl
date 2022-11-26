@@ -13,44 +13,19 @@ carrega(A) :-
 :- initialization(init).
 
 init :- carrega('operacoes.bd').
-
-data_hoje(D,M,Y) :- get_time(T), stamp_date_time(T, date(Y, M, D, _, _, _, _, _, _), 'UTC').
 %-----------------------------------------------------------------------------------------
 
 
 %-----------------------------------------------------------------------------------------
-%acao(Ticket, Preço Unitário)
+/*funções de manipulação de lista*/
+elemento(X, [X|[]]).
+elemento(X,[X|_]).
+elemento(X,[_|L]) :- elemento(X,L).
 
-:- dynamic acao/2.
-:- dynamic lista_precoU/2.
+ultimo(X,[X]).
+ultimo(X,[_|T]) :- ultimo(X,T).
 
-acao('PETR4', 15.34).
-acao('PETR4', 15.4).
-acao('PETR4', 15.3).
-acao('PETR4', 1.34).
-acao('ITSA4', 8.51).
-acao('BBAS3', 28.51).
-acao('MOVI3', 8.50).
-acao('VIIA3', 4.03).
-
-cadastro_acao(X,Y) :- assertz(acao(X,Y)).
-
-precos_acao(A, L) :- bagof(X, acao(A,X), L), assert(lista_precoU(A, L)).
-
-last(X,[X]).
-last(X,[_|T]) :- last(X,T).
-
-member(X,[X|_]).
-member(X,[_|L]) :- member(X,L).
-
-ultimo_preco(A, X) :- 
-  lista_precoU(A, L),
-  last(X,L), !.
-
-acoes :- 
-  (write('\nTicket | Preço Unitário\n'), write('-----------------------\n')),
-  forall(acao(T,P), (write(T),write('  | '),write(P), write('\n'))),
-  write('-----------------------\n\n').
+remove_primeiro([_|X], X). 
 %-----------------------------------------------------------------------------------------
 
 
@@ -58,6 +33,8 @@ acoes :-
 %cadastro de operações(Data, Ticket, Operacao, Preço Unitário, Quantidade, Taxas, Custo Total)
 
 :- dynamic operacao/7.
+
+data_hoje(D,M,Y) :- get_time(T), stamp_date_time(T, date(Y, M, D, _, _, _, _, _, _), 'UTC').
 
 salva_operacoes :- salva(operacao(_,_,_,_,_,_,_), 'operacoes.bd').
 
@@ -103,23 +80,13 @@ operacoes :-
 :- dynamic acao/4.
 :- dynamic nomes/1.
 :- dynamic lista_nomes/1.
-:- dynamic teste/2.
 :- dynamic acao_quantidade/2.
 :- dynamic acao_taxa/2.
 :- dynamic acao_preco_medio/2.
 :- dynamic taxa/2.
 :- dynamic preco/2.
 :- dynamic quantidade/2.
-
-/*funções de manipulação de lista*/
-elemento(X,[X|_]).
-elemento(X,[_|L]) :- elemento(X,L).
-
-ultimo(X,[X]).
-ultimo(X,[_|T]) :- ultimo(X,T).
-
-remove_primeiro([_|X], X). 
-/*funções de manipulação de lista*/
+:- dynamic preco_medio/3.
 
 separa_nomes :-
   retractall(nomes(_)),
@@ -129,24 +96,17 @@ nomes :- setof(X, nomes(X), L), assert(lista_nomes(L)).
 
 separa_quantidade :- forall(operacao(data(_,_,_),A,_,_,N,_,_), assert(acao_quantidade(A,N))).
 
-lista_quantidade :- forall(bagof(N, acao_quantidade(A,N), L), assert(quantidade(A, L))), 
-  listing(quantidade/2).
-
-soma_quantidade :- forall(quantidade(A,_), 
-  (quantidade(A,L), (aggregate(sum(X), elemento(X,L), Total)), assert(teste(A,Total)))),
-  listing(teste/2).
+lista_quantidade :- forall(bagof(N, acao_quantidade(A,N), L), assert(quantidade(A, L))).
 
 separa_taxa :- forall(operacao(data(_,_,_),A,_,_,_,T,_), assert(acao_taxa(A,T))).
 
-lista_taxa :- forall(bagof(T, acao_taxa(A,T), L), assert(taxa(A, L))), 
-  listing(taxa/2).
+lista_taxa :- forall(bagof(T, acao_taxa(A,T), L), assert(taxa(A, L))).
 
 separa_preco :- forall(operacao(data(_,_,_),A,_,P,_,_,_), assert(acao_preco_medio(A,P))).
 
-lista_preco :- forall(bagof(P, acao_preco_medio(A,P), L), assert(preco(A, L))), 
-  listing(preco/2).
+lista_preco :- forall(bagof(P, acao_preco_medio(A,P), L), assert(preco(A, L))).
 
-separa :-   
+separa_estruturas :-   
   separa_quantidade,
   lista_quantidade,
   separa_taxa,
@@ -156,27 +116,45 @@ separa :-
   separa_nomes,
   nomes.
 
-recursao(A, LP, LN, LT) :- 
-  acao(A, LP, LN, LT),
-  (elemento(P, LP),
-  elemento(N, LN),  
-  elemento(T, LT)),
-  (write(A),write(', '),write(P),write(', '),write(N),write(', '),write(T),write('\n')),
-  remove_primeiro(LP, X), remove_primeiro(LN, Y), remove_primeiro(LT, Z),
-  assert(acao(A,P,N,T)),
-  recursao(A, X, Y, Z).
-
-calcula_preco_medio :- 
-  separa,
-  lista_nomes(Y),
-  forall(elemento(A, Y), (preco(A, P), quantidade(A, N), taxa(A, T), assert(acao(A, P, N, T)))).
-
 calcula_carteira :- 
-  calcula_preco_medio.
+  separa_estruturas,
+  lista_nomes(Y),
+  forall(elemento(A, Y), (preco(A, P), quantidade(A, N), taxa(A, T), assert(acao(A, P, N, T)))),
+  aux_preco_medio.
+
+calcula_pm(A, [P|[]], [N|[]], [T|[]],PM1, NA) :- 
+  N2 is NA + N,
+  (N2 =< 0 -> PMA is 0; PMA is ((NA*PM1 + (N * P + T))/N2)),
+  assert(preco_medio(A,PMA,N2)).
+calcula_pm(A, PL, NL, TL, PM1, NA) :- 
+  elemento(N,NL),
+  N2 is NA + N,
+  remove_primeiro(PL, PT),
+  remove_primeiro(NL, NT),
+  remove_primeiro(TL, TT),
+  calcula_pm(A, PT, NT, TT,PM1,N2).
+
+aux_preco_medio :- 
+  forall(acao(A,PL,NL,TL), (elemento(P,PL), elemento(N,NL),elemento(T,TL), 
+  PM is N * (P + T)/N, calcula_pm(A,PL,NL,TL,PM,0))).  
+
+imprime_preco_medio :- 
+  (write('Ação'),write(' | '),write('Preço Médio'),write(' | '),
+  write(' Quantidade '),write(' | '),write('Valor Investido'),write('\n')),
+  forall(preco_medio(A,PM,N), (
+    N =< 0 -> ! ;
+    trunca(PM, PMT),
+    Total is PM * N,
+    trunca(Total,TotalT),
+    (PM >= 10 -> write(A),write('|    '),write(PMT),write('    |      '),
+    write(N),write('     | '),write(TotalT),write('\n');
+    write(A),write('|    '),write(0),write(PMT),write('    |      '),write(N),
+    write('     | '),write(TotalT),write('\n')
+    ))).
 
 carteira :- 
   calcula_carteira, 
-  listing(acao/4).
+  imprime_preco_medio.
 %-----------------------------------------------------------------------------------------
 
 
