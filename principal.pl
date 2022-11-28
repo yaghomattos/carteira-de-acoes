@@ -30,8 +30,8 @@ menu :-
 run_opt(1) :- write("\nUsar o formato: cadastro_operacao('AÇÃO', 'Operação', preço, quantidade)\n\n").
 run_opt(2) :- write('\n______________________________Operações Cadastradas:______________________________\n'),operacoes, menu.
 run_opt(3) :- write('\n_________________Carteira de Ações:_________________\n'), carteira, menu.
-run_opt(4) :- write("\nUsar o formato: calcula_lucro(Ano)\n\n").
-run_opt(5) :- write("\nUsar o formato: operacao_acao('Ação', ano, operação)\n\n").
+run_opt(4) :- write("\nUsar o formato: calcula_lucro(ano)\n\n").
+run_opt(5) :- write("\nUsar o formato: operacao_acao('AÇÃO', ano, 'Operação')\n\n").
 run_opt(6) :- write('Finalizado...\n'), halt.
 %-----------------------------------------------------------------------------------------
 
@@ -83,26 +83,40 @@ cadastro_operacao(A, 'Compra', P, N) :-
   imprime_operacao(data(D,M,Ano), A, 'Compra', P, N, T_Truncada, C_Truncado),
   salva_operacoes, menu. 
 
+
 cadastro_operacao(A, 'Venda', P, N) :- 
-  T is N * P * 0.00025 + N * P * 0.00005,
-  trunca(T,T_Truncada),
-  N_Negativa is N * (-1),
-  C is P * N_Negativa + T, 
-  trunca(C,C_Truncado),
-  data_hoje(D,M,Ano),
-  assertz(operacao(data(D,M,Ano), A, 'Venda', P, N_Negativa, T_Truncada, C_Truncado)),
-  cabecalho_operacao,
-  imprime_operacao(data(D,M,Ano), A, 'Venda', P, N_Negativa, T_Truncada, C_Truncado),
-  salva_operacoes, menu. 
+  separa_nomes,
+  (nomes(A) -> 
+    separa_quantidade,
+    aggregate(sum(X), acao_quantidade(A,X), Total_N),
+    (Total_N >= N -> (
+      T is N * P * 0.00025 + N * P * 0.00005,
+      trunca(T,T_Truncada),
+      N_Negativa is N * (-1),
+      C is P * N_Negativa + T, 
+      trunca(C,C_Truncado),
+      data_hoje(D,M,Ano),
+      assertz(operacao(data(D,M,Ano), A, 'Venda', P, N_Negativa, T_Truncada, C_Truncado)),
+      cabecalho_operacao,
+      imprime_operacao(data(D,M,Ano), A, 'Venda', P, N_Negativa, T_Truncada, C_Truncado),
+      salva_operacoes
+      );
+      write('\nVenda não realizada, ações em posse menor que a quantidade em venda!\n')
+    );
+    write('\nVenda não realizada, ação não existe na base de dados!\n')
+  ), menu. 
 
 cabecalho_operacao :- 
   (write('   Data    | Ticket | Operacao | Preço Unitário | Quantidade | Taxas | Custo Total\n'), write('----------------------------------------------------------------------------------\n')).
 
 imprime_operacao(data(D,M,Ano),A,O,P,N,T,C) :- 
   format('~|~`0t~d~2+', [D]),write('/'),format('~|~`0t~d~2+', [M]),write('/'),
-  write(Ano),write(' | '),write(A),write('  |  '),(O == 'Compra' -> write(O); (write(O), write(' '))),
-  write('  |      '),write(P),write('     |     '),write(N),write('    | '),write(T),
-  write('  |   '),write(C),nl.
+  write(Ano),write(' | '),write(A),write('  |  '),
+  (O == 'Compra' -> write(O); (write(O), write(' '))),write('  |      '),
+  (P >= 10 -> format('~2f', [P]); write(0), format('~2f', [P])),
+  (N > 0 -> write('     |     '),write(N); write('     |    '), write(N)),
+  write('    | '),format('~2f', [T]),
+  (C > 0 -> write('  |   '),write(C); write('  |  '),write(C)),nl.
 
 operacoes :- 
   carrega('operacoes.txt'),
@@ -113,16 +127,16 @@ operacoes :-
 
 
 %-----------------------------------------------------------------------------------------
-/* Estruturas d */
+/* Estruturas de separação de predicados para o calculo do preço médio e da carteira de ações */
 
 :- dynamic acao/4.
 :- dynamic nomes/1.
 :- dynamic lista_nomes/1.
 :- dynamic acao_quantidade/2.
 :- dynamic acao_taxa/2.
-:- dynamic acao_preco_medio/2.
+:- dynamic acao_preco_unitario/2.
 :- dynamic taxa/2.
-:- dynamic preco/2.
+:- dynamic preco_unitario/2.
 :- dynamic quantidade/2.
 :- dynamic preco_medio/3.
 
@@ -140,9 +154,9 @@ separa_taxa :- forall(operacao(data(_,_,_),A,_,_,_,T,_), assert(acao_taxa(A,T)))
 
 lista_taxa :- forall(bagof(T, acao_taxa(A,T), L), assert(taxa(A, L))).
 
-separa_preco :- forall(operacao(data(_,_,_),A,_,P,_,_,_), assert(acao_preco_medio(A,P))).
+separa_preco :- forall(operacao(data(_,_,_),A,_,P,_,_,_), assert(acao_preco_unitario(A,P))).
 
-lista_preco :- forall(bagof(P, acao_preco_medio(A,P), L), assert(preco(A, L))).
+lista_preco :- forall(bagof(P, acao_preco_unitario(A,P), L), assert(preco_unitario(A, L))).
 
 separa_estruturas :-   
   separa_quantidade,
@@ -155,9 +169,11 @@ separa_estruturas :-
   nomes.
 
 calcula_carteira :- 
+  retractall(acao(_,_,_,_)),
   separa_estruturas,
   lista_nomes(Y),
-  forall(elemento(A, Y), (preco(A, P), quantidade(A, N), taxa(A, T), assert(acao(A, P, N, T)))),
+  forall(elemento(A, Y), (preco_unitario(A, P), quantidade(A, N), taxa(A, T), 
+    assert(acao(A, P, N, T)))),
   aux_preco_medio.
 
 calcula_pm(A, [P|[]], [N|[]], [T|[]],PM1, NA) :- 
@@ -173,8 +189,9 @@ calcula_pm(A, PL, NL, TL, PM1, NA) :-
   calcula_pm(A, PT, NT, T_Truncada,PM1,N2).
 
 aux_preco_medio :- 
+  retractall(preco_medio(_,_,_)),
   forall(acao(A,PL,NL,TL), (elemento(P,PL), elemento(N,NL),elemento(T,TL), 
-  PM is N * (P + T)/N, calcula_pm(A,PL,NL,TL,PM,0))).  
+    PM is N * (P + T)/N, calcula_pm(A,PL,NL,TL,PM,0))).  
 
 imprime_preco_medio :- 
   (write('\nAção'),write('  | '),write('Preço Médio'),write(' | '),
@@ -185,11 +202,11 @@ imprime_preco_medio :-
     trunca(PM, PMT),
     Total is PM * N,
     trunca(Total,TotalT),
-    (PM >= 10 -> write(A),write(' |    '),write(PMT),write('    |      '),
-    write(N),write('     | '),write(TotalT),nl;
-    write(A),write(' |    0'),write(PMT),write('    |      '),write(N),
-    write('     | '),write(TotalT),nl
-    ))),
+    (PM >= 10 -> (
+      write(A),write(' |    '),write(PMT),write('    |      '),
+      write(N),write('     |     '),write(TotalT),nl;
+      write(A),write(' |    0'),write(PMT),write('    |      '),write(N),
+      write('     |     '),write(TotalT),nl))),
   write('-----------------------------------------------------\n').
 
 carteira :- 
@@ -199,44 +216,55 @@ carteira :-
 
 
 %-----------------------------------------------------------------------------------------
+/* 
+  Estruturas de separação do preço unitário pelo ano, somatorio de preços 
+  unitários por ação, lucro por ação e lucro total
+*/
+
 :- dynamic lucro/2.
-:- dynamic custo/2.
-:- dynamic preco/1.
+:- dynamic preco_unit/2.
+:- dynamic custo/1.
 :- dynamic lucro_total/1.
 
 separa(Ano) :- 
-  retractall(custo(_,_)), 
-  forall(operacao(data(_,_,Ano),A,_,_,_,_,C), assert(custo(A,C))).
+  retractall(preco_unit(_,_)), 
+  forall(operacao(data(_,_,Ano),A,_,_,_,_,C), assert(preco_unit(A,C))).
 
-somatorio :- 
+somatorio_preco_unit :- 
   retractall(lucro(_,_)),
-  forall((aggregate(sum(C), custo(A,C), Total)), assert(lucro(A, Total))).
+  forall((aggregate(sum(C), preco_unit(A,C), Total)), 
+    (trunca(Total,Total_Truncado), X is Total_Truncado * (-1), assert(lucro(A, X)))).
 
 separa_lucro :- 
-  retractall(preco(_)),
-  forall(lucro(_,C), assert(preco(C))).
+  retractall(custo(_)),
+  forall(lucro(_,C), assert(custo(C))).
 
 calcula_total :- 
-  separa_lucro, aggregate(sum(C), preco(C), Total), assert(lucro_total(Total)).
+  retractall(lucro_total(_)),
+  separa_lucro, 
+  aggregate(sum(C), custo(C), Total),
+  trunca(Total,Total_Truncado), 
+  assert(lucro_total(Total_Truncado)).
 
 calcula_lucro(Ano) :- 
   separa(Ano),
-  somatorio,
+  somatorio_preco_unit,
   calcula_total,
   lucro_total(T),
   (write('\nAção  | Lucro\n'), write('--------------------\n')),
   forall(lucro(X,Y), (write(X), write(' | ') ,write(Y), nl)),
-  (write('--------------------\n'), write('Lucro Total: '), write(T), write('\n--------------------\n\n')), 
+  (write('--------------------\n'), write('Lucro Total: '), write(T), 
+    write('\n--------------------\n\n')), 
   menu.
 %-----------------------------------------------------------------------------------------
 
 
 %-----------------------------------------------------------------------------------------
+/* Estrutura de listagem de operações por ação */
+
 operacao_acao(Acao, Ano, Operacao) :-  
-  (write('\nData      | Ticket | Operacao | Preço Unitário | Quantidade | Taxas | Custo Total\n'), write('----------------------------------------------------------------------------------\n')),
-  forall(operacao(data(D,M,Ano),Acao,Operacao,P,N,T,C), (write(D),
-  write('/'),write(M),write('/'),write(Ano),write(' | '),write(Acao),write('  | '),
-  write(Operacao),write('   | '),write(P),write('  | '), write(N),write('  | '),write(T),
-  write('  | '),write(C),nl)), 
+  cabecalho_operacao,
+  forall(operacao(data(D,M,Ano),Acao,Operacao,P,N,T,C), 
+    (imprime_operacao(data(D,M,Ano),Acao,Operacao,P,N,T,C))), 
   menu.
 %-----------------------------------------------------------------------------------------
